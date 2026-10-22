@@ -1,11 +1,5 @@
 const PICKER_ID = 'roster-source'; // 浏览器按此 id 记住上次选文件的目录
-const SPREADSHEET_TYPES = [{
-  description: '报名表',
-  accept: {
-    'application/vnd.ms-excel': ['.xls'],
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-  },
-}];
+const XLS_TYPES = [{ description: '报名表', accept: { 'application/vnd.ms-excel': ['.xls'] } }];
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const LINK_SOURCE_NAME = '导出链接'; // 接口不允许网页读取文件名，日期从表格标题识别
 const BLOB_URL_LIFETIME_MS = 60000;
@@ -13,15 +7,11 @@ const NO_SLOT_LABEL = '未选时段';
 
 const $ = (id) => document.getElementById(id);
 const fileInput = $('file-input');
-const linkForm = $('link-form');
 const linkInput = $('link-input');
 const dateInput = $('date-input');
 const statusBox = $('status');
 
 let currentRecords = null;
-// iOS Safari 要求点击后立刻调用 navigator.share，否则报 NotAllowedError，所以输出文件提前生成好
-let preparedFile = null;
-let prepareError = null;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
@@ -37,36 +27,12 @@ function clearStatus() {
   statusBox.hidden = true;
 }
 
-function selectedDay() {
-  if (!dateInput.value) throw new Error('请先选择活动日期');
-  const [year, month, day] = dateInput.value.split('-').map(Number);
-  return { year, month, day };
-}
-
 function loadWorkbook(bytes, sourceName) {
-  const workbook = XLSX.read(bytes, { type: 'array' });
+  const workbook = readXls(bytes);
   currentRecords = extractRecords(workbook);
   const day = detectDay(sourceName, workbook, new Date().getFullYear());
   dateInput.value = day ? formatIsoDate(day) : '';
-  prepareOutput();
   renderResult(sourceName, Boolean(day));
-}
-
-function prepareOutput() {
-  try {
-    preparedFile = buildOutputFile();
-    prepareError = null;
-  } catch (error) {
-    preparedFile = null;
-    prepareError = error;
-    console.error(error);
-  }
-}
-
-// 没有可用的输出文件时提示原因，返回 null
-function outputFileOrReport() {
-  if (!preparedFile) showStatus(`生成失败：${prepareError.message}`, 'error');
-  return preparedFile;
 }
 
 function renderResult(sourceName, dayDetected) {
@@ -100,7 +66,7 @@ function renderResult(sourceName, dayDetected) {
 async function handleFile(file) {
   clearStatus();
   try {
-    loadWorkbook(await file.arrayBuffer(), file.name);
+    loadWorkbook(new Uint8Array(await file.arrayBuffer()), file.name);
   } catch (error) {
     showStatus(`读取「${file.name}」失败：${error.message}`, 'error');
     console.error(error);
@@ -111,7 +77,7 @@ async function handleFile(file) {
 async function pickFileWithPicker() {
   let handle;
   try {
-    [handle] = await window.showOpenFilePicker({ id: PICKER_ID, startIn: 'downloads', types: SPREADSHEET_TYPES });
+    [handle] = await window.showOpenFilePicker({ id: PICKER_ID, startIn: 'downloads', types: XLS_TYPES });
   } catch (error) {
     if (error.name === 'AbortError') return; // 用户取消了选择
     showStatus(`打开文件选择器失败：${error.message}`, 'error');
@@ -143,8 +109,8 @@ async function fetchFromLink() {
     }
     if (!response.ok) throw new Error(`接口返回 ${response.status}，链接可能已失效`);
     const bytes = new Uint8Array(await response.arrayBuffer());
-    if (!isSpreadsheet(bytes)) {
-      throw new Error(`下载到的不是 Excel 文件（${response.headers.get('content-type') || '未知类型'}），链接可能已失效`);
+    if (!isXlsFile(bytes)) {
+      throw new Error(`下载到的不是 .xls 文件（${response.headers.get('content-type') || '未知类型'}），链接可能已失效`);
     }
     loadWorkbook(bytes, LINK_SOURCE_NAME);
   } catch (error) {
@@ -155,14 +121,20 @@ async function fetchFromLink() {
   }
 }
 
+// 生成很快（毫秒级），点击时现做，iOS 分享仍在用户点击的有效期内
 function buildOutputFile() {
-  const day = selectedDay();
-  const bytes = XLSX.write(buildOutputWorkbook(currentRecords, day), { type: 'array', bookType: 'xlsx' });
-  return new File([bytes], outputFilename(day), { type: XLSX_MIME });
+  if (!dateInput.value) {
+    showStatus('请先选择活动日期', 'error');
+    return null;
+  }
+  const [year, month, day] = dateInput.value.split('-').map(Number);
+  const date = { year, month, day };
+  const bytes = writeXlsx(buildOutputSheet(currentRecords, date), OUTPUT_FONTS);
+  return new File([bytes], outputFilename(date), { type: XLSX_MIME });
 }
 
 function downloadOutput() {
-  const outputFile = outputFileOrReport();
+  const outputFile = buildOutputFile();
   if (!outputFile) return;
   const link = document.createElement('a');
   link.href = URL.createObjectURL(outputFile);
@@ -171,16 +143,10 @@ function downloadOutput() {
   setTimeout(() => URL.revokeObjectURL(link.href), BLOB_URL_LIFETIME_MS);
 }
 
-// 不能是 async，也不能在 share 之前 await，否则 Safari 认为不是用户点击触发的
 function shareOutput() {
-  const outputFile = outputFileOrReport();
+  const outputFile = buildOutputFile();
   if (!outputFile) return;
-  const shareData = { files: [outputFile] };
-  if (!navigator.canShare(shareData)) {
-    showStatus('当前浏览器不支持分享文件，请用下载', 'error');
-    return;
-  }
-  navigator.share(shareData).catch((error) => {
+  navigator.share({ files: [outputFile] }).catch((error) => {
     if (error.name === 'AbortError') return; // 用户关闭了分享面板
     showStatus(`分享失败（${error.name}）：${error.message}`, 'error');
     console.error(error);
@@ -211,20 +177,19 @@ if (window.showOpenFilePicker) {
     event.preventDefault(); // 不打开 label 关联的原生文件框
     pickFileWithPicker();
   });
+  $('pick-hint').textContent = '会记住上次选文件的目录，也可以把文件拖到这里';
 }
 fileInput.addEventListener('change', handleChosenInputFile);
 // 脚本还没加载完时用户可能已经通过原生文件框选好了文件
 handleChosenInputFile();
-dateInput.addEventListener('change', prepareOutput);
-linkForm.addEventListener('submit', (event) => {
+$('link-form').addEventListener('submit', (event) => {
   event.preventDefault();
   fetchFromLink();
 });
 $('download-button').addEventListener('click', downloadOutput);
 $('share-button').addEventListener('click', shareOutput);
-
 setupDragAndDrop();
-if (window.showOpenFilePicker) $('pick-hint').textContent = '会记住上次选文件的目录，也可以把文件拖到这里';
+
 if (navigator.clipboard && navigator.clipboard.readText) {
   const pasteButton = $('paste-button');
   pasteButton.hidden = false;
@@ -238,5 +203,4 @@ if (navigator.clipboard && navigator.clipboard.readText) {
     fetchFromLink();
   });
 }
-// iOS Safari 支持分享文件，可以直接发到微信或存到"文件"
 if (navigator.canShare) $('share-button').hidden = false;

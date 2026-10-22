@@ -1,0 +1,10 @@
+{
+  "name": "baoming",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "xlsx-js-style": "1.2.0"
+  }
+}

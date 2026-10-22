@@ -9,7 +9,177 @@
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <title>报名表导出</title>
-<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:,"><!-- 不请求 favicon.ico -->
+<style>
+:root {
+  color-scheme: light dark; /* 让日期框等原生控件跟随深色模式 */
+  --bg: #f2f2f7;
+  --card: #ffffff;
+  --text: #1c1c1e;
+  --muted: #8e8e93;
+  --line: #e5e5ea;
+  --accent: #007aff;
+  --accent-soft: rgba(0, 122, 255, 0.12);
+  --success: #34c759;
+  --danger: #ff3b30;
+  --radius: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --card: #1c1c1e;
+    --text: #f2f2f7;
+    --muted: #8e8e93;
+    --line: #38383a;
+    --accent: #0a84ff;
+    --accent-soft: rgba(10, 132, 255, 0.2);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom));
+}
+
+header { padding: 8px 4px 16px; }
+h1 { font-size: 28px; margin: 0; }
+h2 { font-size: 17px; margin: 0 0 12px; }
+.subtitle { color: var(--muted); margin: 6px 0 0; font-size: 14px; }
+.hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  transition: box-shadow 0.15s;
+}
+.card.dragging { box-shadow: 0 0 0 2px var(--accent); }
+
+button, .button {
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+button:active, .button:active { opacity: 0.7; }
+button:disabled { opacity: 0.4; cursor: default; }
+.primary { background: var(--accent); color: #fff; }
+.secondary { background: var(--accent-soft); color: var(--accent); }
+.ghost { background: transparent; color: var(--accent); padding: 12px 8px; }
+.large { width: 100%; padding: 18px; font-size: 18px; }
+.icon { margin-right: 8px; }
+.button { display: block; text-align: center; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 20px 0 12px;
+}
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* 输入框字号不小于 16px，避免 iOS 聚焦时自动放大页面 */
+input[type=url], input[type=date] {
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 12px;
+  min-width: 0;
+}
+.link-row { display: flex; gap: 8px; }
+.link-row input { flex: 1; }
+
+.status {
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  white-space: pre-wrap;
+  background: var(--card);
+}
+.status.error { color: var(--danger); }
+.status.loading::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid var(--accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.result-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.result-head h2 { margin: 0; }
+#source-name { word-break: break-all; }
+.count { color: var(--accent); white-space: nowrap; }
+.count strong { font-size: 32px; }
+.count span { margin-left: 2px; }
+
+.field { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0; }
+.field span { font-weight: 600; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.chip {
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+.chip b { color: var(--accent); margin-left: 4px; }
+
+.table-wrap { overflow-x: auto; margin: 0 -16px -16px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { padding: 10px 16px; text-align: left; border-top: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; font-size: 13px; }
+td.time { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--line);
+}
+.action-bar button { flex: 1; padding: 15px; }
+@media (min-width: 672px) {
+  .action-bar { left: 50%; right: auto; width: 640px; transform: translateX(-50%); border: 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+[hidden] { display: none !important; }
+</style>
 </head>
 <body>
 <main>
@@ -24,8 +194,8 @@
     <label id="pick-button" for="file-input" class="button primary large" role="button">
       <span class="icon">📂</span>选择文件
     </label>
-    <p class="hint" id="pick-hint">从"文件"里选择 .xls / .xlsx</p>
-    <input id="file-input" type="file" accept=".xls,.xlsx" class="visually-hidden">
+    <p class="hint" id="pick-hint">从"文件"里选择小程序导出的 .xls</p>
+    <input id="file-input" type="file" accept=".xls" class="visually-hidden">
 
     <div class="divider"><span>或粘贴小程序导出链接</span></div>
 
@@ -67,9 +237,11 @@
   <button id="share-button" class="secondary" hidden>分享</button>
 </div>
 
-<script src="xlsx.bundle.js"></script>
-<script src="convert.js"></script>
-<script src="link.js"></script>
-<script src="app.js"></script>
+<!-- defer 保持顺序：xlsx.js 要在 convert.js 之前 -->
+<script defer src="xls.js"></script>
+<script defer src="xlsx.js"></script>
+<script defer src="convert.js"></script>
+<script defer src="link.js"></script>
+<script defer src="app.js"></script>
 </body>
 </html>

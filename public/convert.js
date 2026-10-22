@@ -1,4 +1,6 @@
 // 预约名单转换：逻辑与原 Python 版 extract() 保持一致，浏览器和 node 共用
+// 依赖 xlsx.js：浏览器里它先于本文件加载、定义了全局变量，node 里 require
+const xlsxWriter = typeof module !== 'undefined' ? require('./xlsx.js') : { XLSX_STYLE, columnLetter };
 const SHEET_NAME = '文本数据';
 const HEADER_ROW_INDEX = 1; // 第 1 行是活动标题，第 2 行是表头
 const OUTPUT_COLUMNS = ['姓名', '性别', '手机号', '单位（部门）', '预约时间', '签到', '备注'];
@@ -21,16 +23,17 @@ function parseDay(text, year) {
 
 // 先看文件名（与原脚本一致），链接下载的文件名可能没有日期，再看表格第一行的活动标题
 function detectDay(filename, workbook, year) {
-  const titleCell = getSheet(workbook)['A1'];
-  return parseDay(filename, year) || parseDay(String(titleCell ? titleCell.v : ''), year);
+  const titleRow = getRows(workbook)[0] || [];
+  return parseDay(filename, year) || parseDay(String(titleRow[0] ?? ''), year);
 }
 
-function getSheet(workbook) {
-  const sheet = workbook.Sheets[SHEET_NAME];
-  if (!sheet) {
-    throw new Error(`找不到工作表「${SHEET_NAME}」，文件里只有：${workbook.SheetNames.join('、')}`);
+// workbook 是 readXls 的返回值：{ sheetNames, sheets: { 名称: 行数组 } }
+function getRows(workbook) {
+  const rows = workbook.sheets[SHEET_NAME];
+  if (!rows) {
+    throw new Error(`找不到工作表「${SHEET_NAME}」，文件里只有：${workbook.sheetNames.join('、')}`);
   }
-  return sheet;
+  return rows;
 }
 
 function formatIsoDate({ year, month, day }) {
@@ -67,7 +70,7 @@ function convertNumericColumns(records) {
 }
 
 function extractRecords(workbook) {
-  const rows = XLSX.utils.sheet_to_json(getSheet(workbook), { header: 1, raw: true, defval: null });
+  const rows = getRows(workbook);
   const header = rows[HEADER_ROW_INDEX];
   if (!header) {
     throw new Error(`工作表「${SHEET_NAME}」不足 ${HEADER_ROW_INDEX + 1} 行，找不到表头`);
@@ -107,55 +110,26 @@ function extractRecords(workbook) {
   return records;
 }
 
-function buildOutputWorkbook(records, day) {
-  const thinBorder = { style: 'thin', color: { rgb: '000000' } };
-  const border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
-  const titleStyle = {
-    font: { bold: true, sz: TITLE_FONT_SIZE },
-    alignment: { horizontal: 'center', vertical: 'center' },
-    border,
-  };
-  const headerStyle = {
-    font: { bold: true, sz: BODY_FONT_SIZE },
-    alignment: { horizontal: 'center' },
-    border,
-  };
-  const bodyStyle = {
-    font: { sz: BODY_FONT_SIZE },
-    alignment: { horizontal: 'center' },
-    border,
-  };
-
+// 生成 writeXlsx 需要的工作表描述
+function buildOutputSheet(records, day) {
   const columnCount = OUTPUT_COLUMNS.length;
-  const title = `${formatIsoDate(day)}预约名单`;
-  const titleRow = [title, ...Array(columnCount - 1).fill('')];
-  const bodyRows = records.map((record) =>
-    OUTPUT_COLUMNS.map((column) => (isEmptyCell(record[column]) ? '' : record[column])),
-  );
-  const sheet = XLSX.utils.aoa_to_sheet([titleRow, OUTPUT_COLUMNS, ...bodyRows]);
-
-  const rowStyles = [titleStyle, headerStyle];
-  const totalRows = 2 + bodyRows.length;
-  for (let rowIndex = 0; rowIndex < totalRows; rowIndex++) {
-    for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
-      const address = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
-      sheet[address].s = rowStyles[rowIndex] || bodyStyle;
-    }
-  }
-  sheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: columnCount - 1 } }];
-  sheet['!cols'] = OUTPUT_COLUMNS.map((_, columnIndex) =>
-    COLUMN_WIDTHS[columnIndex] ? { wch: COLUMN_WIDTHS[columnIndex] } : {},
-  );
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, SHEET_NAME);
-  return workbook;
+  const titleRow = [`${formatIsoDate(day)}预约名单`, ...Array(columnCount - 1).fill('')];
+  const bodyRows = records.map((record) => OUTPUT_COLUMNS.map((column) => (isEmptyCell(record[column]) ? '' : record[column])));
+  return {
+    name: SHEET_NAME,
+    rows: [titleRow, OUTPUT_COLUMNS, ...bodyRows],
+    rowStyles: [xlsxWriter.XLSX_STYLE.TITLE, xlsxWriter.XLSX_STYLE.HEADER, ...bodyRows.map(() => xlsxWriter.XLSX_STYLE.BODY)],
+    merges: [`A1:${xlsxWriter.columnLetter(columnCount - 1)}1`],
+    columnWidths: COLUMN_WIDTHS,
+  };
 }
+
+const OUTPUT_FONTS = { title: TITLE_FONT_SIZE, body: BODY_FONT_SIZE };
 
 function outputFilename(day) {
   return `${day.month}月${day.day}日.xlsx`;
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { detectDay, formatIsoDate, extractRecords, buildOutputWorkbook, outputFilename, OUTPUT_COLUMNS };
+  module.exports = { detectDay, formatIsoDate, extractRecords, buildOutputSheet, outputFilename, OUTPUT_COLUMNS, OUTPUT_FONTS };
 }

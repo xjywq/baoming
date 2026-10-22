@@ -3,10 +3,6 @@ const EXPORT_ORIGIN = 'https://api-xcx.qunsou.co';
 const EXPORT_PATH = '/mini/enroll/v2/export';
 const EXPORT_ID_PARAM = 'id';
 const URL_IN_TEXT_PATTERN = /https?:\/\/[^\s"'<>，。；]+/;
-const SPREADSHEET_SIGNATURES = [
-  [0xd0, 0xcf, 0x11, 0xe0], // .xls（OLE）
-  [0x50, 0x4b, 0x03, 0x04], // .xlsx（zip）
-];
 
 // 从粘贴的文字里取出导出链接；不是小程序导出链接就报错
 function parseExportLink(text) {
@@ -19,10 +15,6 @@ function parseExportLink(text) {
   return url.href;
 }
 
-function isSpreadsheet(bytes) {
-  return SPREADSHEET_SIGNATURES.some((signature) => signature.every((byte, i) => bytes[i] === byte));
-}
-
 if (typeof module !== 'undefined') {
-  module.exports = { parseExportLink, isSpreadsheet };
+  module.exports = { parseExportLink };
 }
