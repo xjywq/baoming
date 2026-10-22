@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="报名表导出">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>报名表导出</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>报名表导出</h1>
+    <p class="subtitle">把小程序导出的报名表整理成按时段排序的预约名单</p>
+  </header>
+
+  <section class="card" id="drop-zone">
+    <h2>导入报名表</h2>
+    <button id="pick-button" class="primary large">
+      <span class="icon">📂</span>选择文件
+    </button>
+    <p class="hint" id="pick-hint">从"文件"里选择 .xls / .xlsx</p>
+    <input id="file-input" type="file" accept=".xls,.xlsx" hidden>
+
+    <div class="divider"><span>或粘贴小程序导出链接</span></div>
+
+    <form id="link-form" class="link-row">
+      <input id="link-input" type="url" inputmode="url" placeholder="https://api-xcx.qunsou.co/..." autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button type="button" id="paste-button" class="ghost" hidden>粘贴</button>
+      <button type="submit" id="fetch-button" class="secondary">读取</button>
+    </form>
+    <p class="hint">链接会经服务器中转下载，不会保存；选择文件则完全在本机处理</p>
+  </section>
+
+  <div id="status" class="status" role="status" hidden></div>
+
+  <section class="card" id="result" hidden>
+    <div class="result-head">
+      <div>
+        <h2 id="result-title">预约名单</h2>
+        <p class="hint" id="source-name"></p>
+      </div>
+      <div class="count"><strong id="record-count">0</strong><span>人</span></div>
+    </div>
+
+    <label class="field">
+      <span>活动日期</span>
+      <input id="date-input" type="date">
+    </label>
+
+    <div id="slot-chips" class="chips"></div>
+
+    <div class="table-wrap">
+      <table id="preview"></table>
+    </div>
+  </section>
+</main>
+
+<div id="action-bar" class="action-bar" hidden>
+  <button id="download-button" class="primary">下载表格</button>
+  <button id="share-button" class="secondary" hidden>分享</button>
+</div>
+
+<script src="cpexcel.js"></script>
+<script src="xlsx.bundle.js"></script>
+<script src="convert.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
