@@ -1,4 +1,3 @@
-const FETCH_ENDPOINT = '/api/fetch';
 const PICKER_ID = 'roster-source'; // 浏览器按此 id 记住上次选文件的目录
 const SPREADSHEET_TYPES = [{
   description: '报名表',
@@ -8,7 +7,7 @@ const SPREADSHEET_TYPES = [{
   },
 }];
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const URL_IN_TEXT_PATTERN = /https?:\/\/[^\s"'<>，。；]+/;
+const LINK_SOURCE_NAME = '导出链接'; // 接口不允许网页读取文件名，日期从表格标题识别
 const BLOB_URL_LIFETIME_MS = 60000;
 const NO_SLOT_LABEL = '未选时段';
 
@@ -106,24 +105,31 @@ async function pickFile() {
 }
 
 async function fetchFromLink() {
-  const match = linkInput.value.match(URL_IN_TEXT_PATTERN);
-  if (!match) {
-    showStatus('没有找到 http / https 链接', 'error');
+  let url;
+  try {
+    url = parseExportLink(linkInput.value);
+  } catch (error) {
+    showStatus(error.message, 'error');
     return;
   }
-  const url = match[0];
   linkInput.value = url;
   const fetchButton = $('fetch-button');
   fetchButton.disabled = true;
   showStatus('正在下载…', 'loading');
   try {
-    const response = await fetch(`${FETCH_ENDPOINT}?url=${encodeURIComponent(url)}`);
-    if (!response.ok) {
-      const body = await response.json();
-      throw new Error(body.error);
+    let response;
+    try {
+      response = await fetch(url);
+    } catch (error) {
+      // 链接失效时接口会跳转到不允许跨域的网页，浏览器只报网络错误
+      throw new Error(`下载不了，链接可能已失效，或网络不通（${error.message}）`);
     }
-    const filename = decodeURIComponent(response.headers.get('x-filename') || '');
-    loadWorkbook(await response.arrayBuffer(), filename || new URL(url).host);
+    if (!response.ok) throw new Error(`接口返回 ${response.status}，链接可能已失效`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (!isSpreadsheet(bytes)) {
+      throw new Error(`下载到的不是 Excel 文件（${response.headers.get('content-type') || '未知类型'}），链接可能已失效`);
+    }
+    loadWorkbook(bytes, LINK_SOURCE_NAME);
   } catch (error) {
     showStatus(`从链接读取失败：${error.message}`, 'error');
     console.error(error);
