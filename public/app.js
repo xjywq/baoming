@@ -19,6 +19,9 @@ const dateInput = $('date-input');
 const statusBox = $('status');
 
 let currentRecords = null;
+// iOS Safari 要求点击后立刻调用 navigator.share，否则报 NotAllowedError，所以输出文件提前生成好
+let preparedFile = null;
+let prepareError = null;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
@@ -45,7 +48,25 @@ function loadWorkbook(bytes, sourceName) {
   currentRecords = extractRecords(workbook);
   const day = detectDay(sourceName, workbook, new Date().getFullYear());
   dateInput.value = day ? formatIsoDate(day) : '';
+  prepareOutput();
   renderResult(sourceName, Boolean(day));
+}
+
+function prepareOutput() {
+  try {
+    preparedFile = buildOutputFile();
+    prepareError = null;
+  } catch (error) {
+    preparedFile = null;
+    prepareError = error;
+    console.error(error);
+  }
+}
+
+// 没有可用的输出文件时提示原因，返回 null
+function outputFileOrReport() {
+  if (!preparedFile) showStatus(`生成失败：${prepareError.message}`, 'error');
+  return preparedFile;
 }
 
 function renderResult(sourceName, dayDetected) {
@@ -145,29 +166,29 @@ function buildOutputFile() {
 }
 
 function downloadOutput() {
-  try {
-    const outputFile = buildOutputFile();
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(outputFile);
-    link.download = outputFile.name;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), BLOB_URL_LIFETIME_MS);
-  } catch (error) {
-    showStatus(`生成失败：${error.message}`, 'error');
-    console.error(error);
-  }
+  const outputFile = outputFileOrReport();
+  if (!outputFile) return;
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(outputFile);
+  link.download = outputFile.name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), BLOB_URL_LIFETIME_MS);
 }
 
-async function shareOutput() {
-  try {
-    const outputFile = buildOutputFile();
-    if (!navigator.canShare({ files: [outputFile] })) throw new Error('当前浏览器不支持分享文件，请用下载');
-    await navigator.share({ files: [outputFile] });
-  } catch (error) {
-    if (error.name === 'AbortError') return; // 用户关闭了分享面板
-    showStatus(`分享失败：${error.message}`, 'error');
-    console.error(error);
+// 不能是 async，也不能在 share 之前 await，否则 Safari 认为不是用户点击触发的
+function shareOutput() {
+  const outputFile = outputFileOrReport();
+  if (!outputFile) return;
+  const shareData = { files: [outputFile] };
+  if (!navigator.canShare(shareData)) {
+    showStatus('当前浏览器不支持分享文件，请用下载', 'error');
+    return;
   }
+  navigator.share(shareData).catch((error) => {
+    if (error.name === 'AbortError') return; // 用户关闭了分享面板
+    showStatus(`分享失败（${error.name}）：${error.message}`, 'error');
+    console.error(error);
+  });
 }
 
 function setupDragAndDrop() {
@@ -189,6 +210,7 @@ fileInput.addEventListener('change', () => {
   if (fileInput.files[0]) handleFile(fileInput.files[0]);
   fileInput.value = ''; // 允许重复选择同一个文件
 });
+dateInput.addEventListener('change', prepareOutput);
 linkForm.addEventListener('submit', (event) => {
   event.preventDefault();
   fetchFromLink();
