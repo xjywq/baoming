@@ -29,7 +29,8 @@
 
     <div class="divider"><span>或粘贴小程序导出链接</span></div>
 
-    <form id="link-form" class="link-row">
+    <!-- novalidate：允许粘贴带说明文字的整段内容，由 parseExportLink 提取和校验链接 -->
+    <form id="link-form" class="link-row" novalidate>
       <input id="link-input" type="url" inputmode="url" placeholder="https://api-xcx.qunsou.co/..." autocomplete="off" autocapitalize="off" spellcheck="false">
       <button type="button" id="paste-button" class="ghost" hidden>粘贴</button>
       <button type="submit" id="fetch-button" class="secondary">读取</button>
