@@ -10,6 +10,8 @@
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <title>报名表导出</title>
 <link rel="icon" href="data:,"><!-- 不请求 favicon.ico -->
+<!-- 微信内置浏览器选不了文件、存不了生成的表格，在页面渲染前识别出来，只显示换浏览器的引导 -->
+<script>if (/MicroMessenger/i.test(navigator.userAgent)) document.documentElement.classList.add('in-wechat');</script>
 <style>
 :root {
   color-scheme: light dark; /* 让日期框等原生控件跟随深色模式 */
@@ -178,10 +180,32 @@ td.time { color: var(--accent); font-variant-numeric: tabular-nums; }
   .action-bar { left: 50%; right: auto; width: 640px; transform: translateX(-50%); border: 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
+.wechat-guide { display: none; }
+.in-wechat .wechat-guide {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+  text-align: right;
+  padding: calc(8px + env(safe-area-inset-top)) 20px 0;
+}
+.in-wechat main, .in-wechat .action-bar { display: none; }
+.wechat-arrow { font-size: 56px; line-height: 1; margin-right: 6px; }
+.wechat-guide p { margin: 12px 0 0; font-size: 20px; font-weight: 600; line-height: 1.6; }
+.wechat-guide .wechat-note { font-size: 15px; font-weight: 400; color: rgba(255, 255, 255, 0.75); }
+.wechat-dots { display: inline-block; padding: 0 8px; border: 1.5px solid #fff; border-radius: 999px; letter-spacing: 1px; }
+
 [hidden] { display: none !important; }
 </style>
 </head>
 <body>
+<div class="wechat-guide">
+  <div class="wechat-arrow">↗</div>
+  <p>点右上角 <span class="wechat-dots">···</span><br>选择「在浏览器打开」</p>
+  <p class="wechat-note">iPhone 上是「在 Safari 中打开」<br>微信里无法选择文件和保存表格</p>
+</div>
 <main>
   <header>
     <h1>报名表导出</h1>
