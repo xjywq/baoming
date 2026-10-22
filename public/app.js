@@ -153,6 +153,13 @@ function shareOutput() {
   });
 }
 
+// Chromium 内核（Chrome、Edge、安卓浏览器）只允许分享图片、音视频、PDF、txt 等白名单类型，
+// .xlsx 会被拒绝（NotAllowedError: Permission denied），而 canShare 不检查类型、照样返回 true。
+// navigator.userAgentData 只有 Chromium 有，用它识别；iOS 上所有浏览器都是 Safari 内核，可以分享
+function canShareXlsx() {
+  return Boolean(navigator.canShare) && !navigator.userAgentData;
+}
+
 function setupDragAndDrop() {
   const dropZone = $('drop-zone');
   ['dragenter', 'dragover'].forEach((type) => dropZone.addEventListener(type, (event) => {
@@ -203,4 +210,4 @@ if (navigator.clipboard && navigator.clipboard.readText) {
     fetchFromLink();
   });
 }
-if (navigator.canShare) $('share-button').hidden = false;
+if (canShareXlsx()) $('share-button').hidden = false;
