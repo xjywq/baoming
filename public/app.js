@@ -107,12 +107,8 @@ async function handleFile(file) {
   }
 }
 
-// Chrome / Edge 用系统文件选择器，能记住上次的目录；Safari 等不支持的浏览器用普通文件框
-async function pickFile() {
-  if (!window.showOpenFilePicker) {
-    fileInput.click();
-    return;
-  }
+// Chrome / Edge 用系统文件选择器，能记住上次的目录；其他浏览器直接用 label 关联的原生文件框
+async function pickFileWithPicker() {
   let handle;
   try {
     [handle] = await window.showOpenFilePicker({ id: PICKER_ID, startIn: 'downloads', types: SPREADSHEET_TYPES });
@@ -205,11 +201,20 @@ function setupDragAndDrop() {
   });
 }
 
-$('pick-button').addEventListener('click', pickFile);
-fileInput.addEventListener('change', () => {
+function handleChosenInputFile() {
   if (fileInput.files[0]) handleFile(fileInput.files[0]);
   fileInput.value = ''; // 允许重复选择同一个文件
-});
+}
+
+if (window.showOpenFilePicker) {
+  $('pick-button').addEventListener('click', (event) => {
+    event.preventDefault(); // 不打开 label 关联的原生文件框
+    pickFileWithPicker();
+  });
+}
+fileInput.addEventListener('change', handleChosenInputFile);
+// 脚本还没加载完时用户可能已经通过原生文件框选好了文件
+handleChosenInputFile();
 dateInput.addEventListener('change', prepareOutput);
 linkForm.addEventListener('submit', (event) => {
   event.preventDefault();

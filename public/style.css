@@ -56,7 +56,7 @@ h2 { font-size: 17px; margin: 0 0 12px; }
 }
 .card.dragging { box-shadow: 0 0 0 2px var(--accent); }
 
-button {
+button, .button {
   font: inherit;
   font-size: 16px;
   font-weight: 600;
@@ -65,13 +65,15 @@ button {
   padding: 12px 16px;
   cursor: pointer;
 }
-button:active { opacity: 0.7; }
+button:active, .button:active { opacity: 0.7; }
 button:disabled { opacity: 0.4; cursor: default; }
-button.primary { background: var(--accent); color: #fff; }
-button.secondary { background: var(--accent-soft); color: var(--accent); }
-button.ghost { background: transparent; color: var(--accent); padding: 12px 8px; }
-button.large { width: 100%; padding: 18px; font-size: 18px; }
+.primary { background: var(--accent); color: #fff; }
+.secondary { background: var(--accent-soft); color: var(--accent); }
+.ghost { background: transparent; color: var(--accent); padding: 12px 8px; }
+.large { width: 100%; padding: 18px; font-size: 18px; }
 .icon { margin-right: 8px; }
+.button { display: block; text-align: center; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
 
 .divider {
   display: flex;

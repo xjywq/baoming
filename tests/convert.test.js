@@ -1,7 +1,12 @@
 // 运行：node --test tests/convert.test.js
 const test = require('node:test');
 const assert = require('node:assert');
-global.XLSX = require('../public/xlsx.bundle.js');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+// 和浏览器一样按普通脚本加载（定义全局 XLSX）；按 CommonJS 加载会去 require 已删除的 cpexcel.js
+vm.runInThisContext(fs.readFileSync(path.join(__dirname, '../public/xlsx.bundle.js'), 'utf8'));
 const { detectDay, extractRecords, buildOutputWorkbook, outputFilename, OUTPUT_COLUMNS } = require('../public/convert.js');
 
 const SAMPLE_HEADER = ['序号', '昵称', '姓名', '性别', '手机号', '单位（部门）', '9:00-9:30', '13:30-14:00', '10:00-10:30'];

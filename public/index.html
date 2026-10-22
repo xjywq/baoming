@@ -20,11 +20,12 @@
 
   <section class="card" id="drop-zone">
     <h2>导入报名表</h2>
-    <button id="pick-button" class="primary large">
+    <!-- 用 label 关联原生文件框，页面一显示就能点，不用等脚本加载 -->
+    <label id="pick-button" for="file-input" class="button primary large" role="button">
       <span class="icon">📂</span>选择文件
-    </button>
+    </label>
     <p class="hint" id="pick-hint">从"文件"里选择 .xls / .xlsx</p>
-    <input id="file-input" type="file" accept=".xls,.xlsx" hidden>
+    <input id="file-input" type="file" accept=".xls,.xlsx" class="visually-hidden">
 
     <div class="divider"><span>或粘贴小程序导出链接</span></div>
 
@@ -65,7 +66,6 @@
   <button id="share-button" class="secondary" hidden>分享</button>
 </div>
 
-<script src="cpexcel.js"></script>
 <script src="xlsx.bundle.js"></script>
 <script src="convert.js"></script>
 <script src="link.js"></script>
